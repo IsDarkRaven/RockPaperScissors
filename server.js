@@ -1,14 +1,14 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import path from "path";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 const rooms = {}; // Para mantener el estado de los turnos y movimientos
 
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
 io.on("connection", (socket) => {
   console.log("Un usuario se ha conectado");
