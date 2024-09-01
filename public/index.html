@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Piedra, Papel o Tijera</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin-top: 50px;
+      }
+      .choice {
+        cursor: pointer;
+        margin: 10px;
+        font-size: 24px;
+        display: inline-block;
+        padding: 10px 20px;
+        border: 1px solid #333;
+      }
+      .disabled {
+        cursor: not-allowed;
+        color: grey;
+        border-color: grey;
+      }
+      #replayButton {
+        display: none;
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 18px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Piedra, Papel o Tijera</h1>
+    <h1>Nore gei</h1>
+
+    <div id="joinRoom">
+      <input
+        type="text"
+        id="roomName"
+        placeholder="Ingrese el nombre de la sala"
+      />
+      <button id="joinRoomButton">Unirse a la sala</button>
+    </div>
+
+    <div id="game" style="display: none">
+      <div id="choices">
+        <div class="choice disabled" data-move="rock">Piedra</div>
+        <div class="choice disabled" data-move="paper">Papel</div>
+        <div class="choice disabled" data-move="scissors">Tijera</div>
+      </div>
+      <h2 id="result"></h2>
+      <button id="replayButton">Volver a jugar</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      let myMove = null;
+      let room = null;
+
+      const translateMove = (move) => {
+        switch (move) {
+          case "rock":
+            return "Piedra";
+          case "paper":
+            return "Papel";
+          case "scissors":
+            return "Tijera";
+          default:
+            return move;
+        }
+      };
+
+      document
+        .getElementById("joinRoomButton")
+        .addEventListener("click", () => {
+          room = document.getElementById("roomName").value;
+          socket.emit("joinRoom", room);
+          document.getElementById("joinRoom").style.display = "none";
+          document.getElementById("game").style.display = "block";
+        });
+
+      socket.on("message", (message) => {
+        document.getElementById("result").textContent = message;
+      });
+
+      socket.on("yourTurn", () => {
+        document.querySelectorAll(".choice").forEach((choice) => {
+          choice.classList.remove("disabled");
+        });
+        document.getElementById("result").textContent = "¡Es tu turno!";
+      });
+
+      document.querySelectorAll(".choice").forEach((choice) => {
+        choice.addEventListener("click", () => {
+          if (!choice.classList.contains("disabled")) {
+            myMove = choice.getAttribute("data-move");
+            socket.emit("move", { room, move: myMove });
+            document.getElementById("result").textContent =
+              `Elegiste ${translateMove(myMove)}. Esperando al oponente...`;
+
+            document.querySelectorAll(".choice").forEach((choice) => {
+              choice.classList.add("disabled");
+            });
+          }
+        });
+      });
+
+      socket.on("result", ({ myMove, opponentMove, result }) => {
+        let message = `Elegiste ${translateMove(myMove)}. El oponente eligió ${translateMove(opponentMove)}. `;
+        if (result === "win") {
+          message += "¡Ganaste!";
+        } else if (result === "lose") {
+          message += "Perdiste.";
+        } else {
+          message += "¡Es un empate!";
+        }
+        document.getElementById("result").textContent = message;
+
+        // Mostrar el botón de volver a jugar
+        document.getElementById("replayButton").style.display = "inline-block";
+      });
+
+      document.getElementById("replayButton").addEventListener("click", () => {
+        // Reiniciar el estado del juego para ambos jugadores
+        myMove = null;
+        document.getElementById("replayButton").style.display = "none";
+        document.getElementById("result").textContent = "Esperando tu turno...";
+        document.querySelectorAll(".choice").forEach((choice) => {
+          choice.classList.add("disabled");
+        });
+
+        // Emitir un evento para indicar que el jugador está listo para la próxima ronda
+        socket.emit("restartGame", room);
+      });
+    </script>
+  </body>
+</html>
